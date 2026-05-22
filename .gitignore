@@ -1,0 +1,31 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+eggs/
+*.egg-info/
+
+# Environments
+env/
+venv/
+Realtime-IOT/
+Realtime-IOT-env/
+RezaEnv/
+
+# Model artifacts
+# (Include trained model files in the repo for this assignment; ignore large exported models if needed)
+
+# Editor directories and files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
