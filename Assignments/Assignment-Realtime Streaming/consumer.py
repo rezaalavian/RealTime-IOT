@@ -1,12 +1,15 @@
-from confluent_kafka import Consumer, KafkaException
 import json
 import os
 
-KAFKA_BOOTSTRAP = os.environ.get('KAFKA_BOOTSTRAP', 'localhost:9092')
+from confluent_kafka import Consumer, KafkaException
+
+from confluent_cloud import build_kafka_config
+
+
 TOPIC = os.environ.get('PRED_TOPIC', 'predictions')
 
 c = Consumer({
-    'bootstrap.servers': KAFKA_BOOTSTRAP,
+    **build_kafka_config(),
     'group.id': 'output-consumer-group',
     'auto.offset.reset': 'earliest'
 })

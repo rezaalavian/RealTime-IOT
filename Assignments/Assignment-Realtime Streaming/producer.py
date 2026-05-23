@@ -2,19 +2,23 @@ import csv
 import json
 import os
 import time
+
 from confluent_kafka import Producer
 
-KAFKA_BOOTSTRAP = os.environ.get('KAFKA_BOOTSTRAP', 'localhost:9092')
+from confluent_cloud import build_kafka_config
+
+
 TOPIC = os.environ.get('RAW_TOPIC', 'raw-data')
 
-p = Producer({'bootstrap.servers': KAFKA_BOOTSTRAP})
+p = Producer(build_kafka_config())
 
 def delivery_report(err, msg):
     if err is not None:
         print('Delivery failed:', err)
 
 if __name__ == '__main__':
-    csvfile = os.environ.get('INPUT_CSV', 'data/sample.csv')
+    # Use the replay CSV created by prepare_and_train.py.
+    csvfile = os.environ.get('INPUT_CSV', 'data/bike_hour_sample.csv')
     with open(csvfile, newline='') as f:
         reader = csv.DictReader(f)
         for row in reader:

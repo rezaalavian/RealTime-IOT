@@ -4,10 +4,9 @@ __pycache__/
 *$py.class
 
 # Environments
-env/
-venv/
+
 Realtime-IOT/
-RezaEnv/
+
 
 # VS Code
 .vscode/
@@ -18,3 +17,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Private Confluent Cloud settings
+cloud_config.py

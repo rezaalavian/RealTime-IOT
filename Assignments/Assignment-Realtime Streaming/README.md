@@ -1,124 +1,125 @@
-Assignment 1 — Real-Time Streaming with Apache Kafka
+# Assignment 1 — Real-Time Streaming with Apache Kafka
 
-Overview
-- Minimal demo pipeline: Producer → Faust Streams Processor → Output Consumer
+## Overview
+- Goal: replay dataset rows as live events, run a pre-trained ML model in a Streams processor, and publish predictions to an output topic.
+- Demo components: `producer.py` → `faust_app.py` → `consumer.py`.
+- Connection style: notebook-style Confluent Cloud settings using `BOOTSTRAP_SERVER`, `API_KEY`, and `API_SECRET`.
+- For public repos, keep those values in `cloud_config.py` and let Git ignore it.
 
-Dataset & Model
-- Dataset used for the demo: `data/sample.csv` (small example set). Replace this with the full dataset you select for the assignment and re-run training.
-- Model: `LinearRegression` trained offline using `train_model.py` and saved to `model.joblib`.
-- Last training run (small sample): R2 = 0.9788, MAE = 4.5201
+## Step 1 — Choose language & Streams library
+- This repo uses Python + Faust (`faust-streaming`) for the Streams API.
+- Faust provides `@app.agent` agents and topic streams for processing.
 
-Prerequisites
-- Docker & Docker Compose (for running Kafka locally) OR an existing Kafka broker reachable at `KAFKA_BOOTSTRAP`.
-- Conda (to create a reproducible environment)
+## Step 2 — Pick a dataset
+Choose one dataset and train your ML model offline. During the demo, replay rows at about 1 row/second.
 
-Environment setup (recommended)
-1. Create and activate the conda environment used here (`Realtime-IOT`):
+| Key | Dataset | Source | ML Task |
+|------|--------|--------|---------|
+| A | TIHM: Dementia Monitoring | nature.com/articles/s41597-023-02519-y | Detect agitation in PWD |
+| B | Air Quality (UCI) | archive.ics.uci.edu/dataset/360 | Predict CO concentration |
+| C | Credit Card Fraud | kaggle.com/datasets/mlg-ulb/creditcardfraud | Flag fraudulent transactions |
+| D | Bike Sharing (UCI) | archive.ics.uci.edu/dataset/275 | Predict hourly rental count |
+| E | Weather: Oshawa/Toronto | climate.weather.gc.ca | Predict next-hour temperature |
 
-```bash
+This workspace uses the UCI Bike Sharing dataset (option D). `prepare_and_train.py` downloads the data, prepares features (including cyclical hour encoding and categorical indicators), and trains a tuned Gradient Boosting regression model (with a RandomForest fallback if needed). It also writes `data/bike_hour_sample.csv` for the producer.
+
+## Step 3 — What to build
+- Producer: `producer.py` replays rows from `data/bike_hour_sample.csv` by default and publishes JSON to `raw-data`.
+- Streams Processor: `faust_app.py` consumes `raw-data`, loads the regression model, runs inference, and publishes to `predictions`.
+- Output Consumer: `consumer.py` reads `predictions` and prints results.
+- Topic helper: `create_topics.py` creates the Cloud topics using the same notebook-style connection settings.
+
+## Step 4 — ML model
+`prepare_and_train.py` produces:
+- `model.joblib` — GradientBoostingRegressor (tuned via RandomizedSearchCV)
+- `data/bike_hour_sample.csv` — replay rows for the producer
+
+Model training notes and results (example run):
+
+- Best model: `GradientBoostingRegressor` with params `{'subsample': 0.8, 'n_estimators': 200, 'max_depth': 8, 'learning_rate': 0.05}`
+- Example evaluation: **R2 = 0.9476**, **MAE = 24.54** on the held-out test set
+
+The training pipeline will try a RandomForestRegressor if the tuned GBR does not reach a strong R2; the script saves the best performing model to `model.joblib`.
+
+## Notebook-style connection cell
+Use these names in your terminal or a small Python cell, matching the notebook style. If you prefer, place them in `cloud_config.py` in this folder; that file is ignored by Git and read automatically by the code.
+
+```python
+BOOTSTRAP_SERVER = "your-bootstrap-server"
+API_KEY = "your-api-key"
+API_SECRET = "your-api-secret"
+
+KAFKA_CONFIG = {
+	"bootstrap.servers": BOOTSTRAP_SERVER,
+	"security.protocol": "SASL_SSL",
+	"sasl.mechanisms": "PLAIN",
+	"sasl.username": API_KEY,
+	"sasl.password": API_SECRET,
+}
+```
+
+## Quick start
+1. Create and activate the conda env:
+
+```powershell
 conda create -n Realtime-IOT python=3.10 -y
 conda activate Realtime-IOT
 pip install -r "../../requirements.txt"
 ```
 
-2. Train the model (offline):
-
-```bash
-python train_model.py
-# creates model.joblib and prints metrics
-```
-
-Run Kafka locally with Docker (optional, recommended for demo)
-1. Start Kafka (zookeeper + broker):
-
-```bash
-cd "Assignment-Realtime Streaming"
-docker compose up -d
-```
-
-Run Kafka locally (no Docker)
-
-This assignment does not require Docker — a running Kafka broker is required and can be provided by a local Kafka installation, WSL, or a managed Kafka service. Below are instructions for running Kafka locally on Windows.
-
-1. Download and extract Kafka (example):
+2. Export the notebook-style Confluent Cloud settings:
 
 ```powershell
-# download and extract (adjust versions/URLs as needed)
-# Invoke-WebRequest -Uri "https://downloads.apache.org/kafka/3.5.1/kafka_2.13-3.5.1.tgz" -OutFile kafka.tgz
-# tar -xzf kafka.tgz
-# set KAFKA_HOME to the extracted folder
-# setx KAFKA_HOME "C:\kafka_2.13-3.5.1"
+$env:BOOTSTRAP_SERVER = "your-bootstrap-server"
+$env:API_KEY = "your-api-key"
+$env:API_SECRET = "your-api-secret"
 ```
 
-2. Start Zookeeper and Kafka broker (helper provided):
+3. Prepare data and train models:
 
 ```powershell
 cd "Assignment-Realtime Streaming"
-.\run_local_kafka.ps1
+python prepare_and_train.py
 ```
 
-3. Create the topics used by the demo (Windows PowerShell):
+4. Create the Cloud topics:
 
 ```powershell
-.\.\create_topics.ps1
+python create_topics.py
 ```
 
-Run the demo (three terminals)
-- Terminal 1 — Faust processor (runs the Streams app and performs inference):
+5. Run the demo in three terminals. Start the producer first and confirm messages appear in the Confluent Cloud topic viewer before starting the processor:
 
-```bash
-cd "Assignment-Realtime Streaming"
-faust -A faust_app worker -l info
-```
-
-- Terminal 2 — Producer (replays CSV rows ~1 row/s):
-
-```bash
-cd "Assignment-Realtime Streaming"
+```powershell
 python producer.py
 ```
 
-- Terminal 3 — Output consumer (prints predictions):
+```powershell
+faust -A faust_app worker -l info
+```
 
-```bash
-cd "Assignment-Realtime Streaming"
+```powershell
 python consumer.py
 ```
 
-Repository contents (important files)
-- `producer.py` — reads CSV and writes JSON messages to `raw-data` topic
-- `faust_app.py` — Faust Streams processor; loads `model.joblib` and writes predictions to `predictions` topic
-- `consumer.py` — subscribes to `predictions` and prints each message
-- `train_model.py` — trains a `LinearRegression` on `data/sample.csv` and saves `model.joblib`
-- `model.joblib` — trained model produced by `train_model.py`
-- `requirements.txt` — Python dependencies
-- `docker-compose.yml` — local Kafka + Zookeeper service (see below)
+If the topic viewer shows incoming messages but the processor is not running yet, that is expected. Once `faust_app.py` starts, it will consume the queued records and publish predictions.
 
-Authorship & verification
-- Author: Student (code and experiments were performed and verified locally).
-- Note: repository scaffolding and helper scripts were produced to automate setup; the student trained, validated, and verified the model and end-to-end demo locally. If you need the exact author name inserted, replace this line before pushing.
+## Files of interest
+- `prepare_and_train.py` — notebook-style script that downloads the dataset, prepares features (including cyclical hour encoding), trains a tuned `GradientBoostingRegressor` (with RF fallback), saves `model.joblib`, and writes `data/bike_hour_sample.csv`.
+- `producer.py` — uses `INPUT_CSV` or `data/bike_hour_sample.csv`.
+- `faust_app.py` — Faust Streams processor; loads the model from `MODEL_PATH` or uses `model.joblib`.
+- `consumer.py` — prints predictions from `predictions`.
+- `confluent_cloud.py` — shared helper for notebook-style Confluent Cloud settings.
+- `create_topics.py` — creates `raw-data` and `predictions` in Confluent Cloud.
+- `cloud_config.py` — private file for your bootstrap server, API key, and API secret. Keep it out of Git.
 
-Prepare to push
-1. Review the files and replace `data/sample.csv` with your chosen dataset and retrain the model.
-2. Commit and push:
+## Deliverables mapping
+| Item | What to include |
+|------|-----------------|
+| Source code | `producer.py`, `faust_app.py`, `consumer.py`, `prepare_and_train.py` |
+| Trained model | `model.joblib` |
+| Dependencies | `requirements.txt` |
+| README | This file |
+| Video demo | 2–3 minute recording showing the three terminals |
 
-```bash
-git add .
-git commit -m "Assignment 1: Real-time streaming demo with Faust"
-git push origin main
-```
-
-Video demo
-- Upload a short (2–3 minute) recording showing the three terminals running together and the predictions printing live.
-- Add the link below once uploaded (YouTube unlisted, Google Drive, or OneDrive):
-
-Video link: <ADD_YOUR_VIDEO_URL_HERE>
-Troubleshooting
-- If Faust cannot connect to Kafka, confirm `KAFKA_BOOTSTRAP` and that the broker is reachable. To point the apps to a remote broker set:
-
-```bash
-set KAFKA_BOOTSTRAP=broker:9092     # Windows powershell/setx or export on *nix
-```
-
-Contact
-- If you want me to prepare a Git branch and push the prepared files, tell me which remote and branch to use and I'll create the commit for you.
+Video demo link: 'https://drive.google.com/file/d/1zInZaz1w5ETdWq2W_ZLbZ35f7LcxVwsE/view?usp=drive_link'

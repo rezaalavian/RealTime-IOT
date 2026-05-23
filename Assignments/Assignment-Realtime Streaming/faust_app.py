@@ -1,12 +1,25 @@
-import faust
-import joblib
 import json
+import os
 
-app = faust.App('ml_stream_app', broker='kafka://localhost:9092')
+import joblib
+
+from confluent_cloud import build_faust_app
+
+
+app = build_faust_app('ml_stream_app')
 raw_topic = app.topic('raw-data', value_type=bytes)
 pred_topic = app.topic('predictions', value_type=bytes)
 
-model = joblib.load('model.joblib')
+# Choose model path via env or use the single regression model
+model_path = os.environ.get('MODEL_PATH')
+if not model_path:
+    if os.path.exists('model.joblib'):
+        model_path = 'model.joblib'
+    else:
+        raise RuntimeError('No model file found (model.joblib)')
+
+print('Loading model from', model_path)
+model = joblib.load(model_path)
 
 @app.agent(raw_topic)
 async def process(stream):
