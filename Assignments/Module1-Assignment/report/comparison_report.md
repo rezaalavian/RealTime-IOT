@@ -1,8 +1,8 @@
 # Module 1 Assignment — Protocol Comparison Report
 
-**Student Name:** ___________________________
-**Student ID:**   ___________________________
-**Date:**         ___________________________
+**Student Name:** Sayyed Reza Alavian
+**Student ID:**   100981000
+**Date:**         05/27/2026
 
 ---
 
@@ -15,8 +15,8 @@
 | MQTT QoS 0 | 100 | 100 | 0.0% | 0 | 0.0 |
 | MQTT QoS 1 | 100 | 100 | 0.0% | 0 | 0.1 |
 | MQTT QoS 2 | 100 | 100 | 0.0% | 0 | 0.3 |
-| CoAP NON | — | — | — | — | — |
-| CoAP CON | — | — | — | — | — |
+| CoAP NON | 12 | 12 | 0.0% | 0 | 1.0 |
+| CoAP CON | 12 | 21 | 0.0% | 0 | 2.0 |
 | AMQP (confirms off) | — | — | — | — | — |
 
 **Analysis Questions:**
